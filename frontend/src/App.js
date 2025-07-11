@@ -60,10 +60,18 @@ function App() {
     const loadLlmStatus = async () => {
       try {
         const response = await fetch(`${BACKEND_URL}/api/llm-status`);
-        const data = await response.json();
-        setLlmProviders(data);
+        if (response.ok) {
+          const data = await response.json();
+          setLlmProviders(data);
+        } else {
+          console.error('LLM status response not ok:', response.status);
+          // Set fallback data
+          setLlmProviders({ status: 'error', active_providers: 0, total_providers: 0 });
+        }
       } catch (error) {
         console.error('Failed to load LLM providers status:', error);
+        // Set fallback data to prevent crashes
+        setLlmProviders({ status: 'error', active_providers: 0, total_providers: 0 });
       }
     };
     
