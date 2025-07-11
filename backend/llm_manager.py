@@ -290,8 +290,12 @@ class MistralProvider(LLMProvider):
     def __init__(self, config: ProviderConfig):
         super().__init__(config)
         try:
-            import mistralai
-            self.client = mistralai.Mistral(api_key=config.api_key)
+            if config.api_key and config.api_key not in ["your_mistral_api_key_here", ""]:
+                import mistralai
+                self.client = mistralai.Mistral(api_key=config.api_key)
+            else:
+                self.client = None
+                logger.warning("Mistral API key not configured properly")
         except Exception as e:
             logger.error(f"Failed to initialize Mistral: {e}")
             self.client = None
