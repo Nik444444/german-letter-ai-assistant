@@ -140,8 +140,12 @@ class OpenAIProvider(LLMProvider):
     def __init__(self, config: ProviderConfig):
         super().__init__(config)
         try:
-            import openai
-            self.client = openai.OpenAI(api_key=config.api_key)
+            if config.api_key and config.api_key.startswith("sk-proj-"):
+                import openai
+                self.client = openai.OpenAI(api_key=config.api_key)
+            else:
+                self.client = None
+                logger.warning("OpenAI API key not configured properly")
         except Exception as e:
             logger.error(f"Failed to initialize OpenAI: {e}")
             self.client = None
