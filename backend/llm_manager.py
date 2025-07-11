@@ -266,7 +266,7 @@ class CohereProvider(LLMProvider):
             raise
             
     def is_available(self) -> bool:
-        return self.client is not None and self.config.api_key != "your_cohere_api_key_here"
+        return self.client is not None and self.config.api_key and self.config.api_key not in ["your_cohere_api_key_here", ""]
 
 class MistralProvider(LLMProvider):
     """Mistral provider"""
