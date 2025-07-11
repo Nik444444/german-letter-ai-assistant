@@ -93,6 +93,9 @@ function App() {
       error: "Error",
       noFile: "Please select a file first",
       uploadError: "Upload failed. Please try again.",
+      llmProvider: "AI Provider Used",
+      llmStatus: "AI Providers Status",
+      activeProviders: "Active Providers",
       urgencyLevels: {
         LOW: "Low",
         MEDIUM: "Medium", 
