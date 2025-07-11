@@ -253,8 +253,12 @@ class CohereProvider(LLMProvider):
     def __init__(self, config: ProviderConfig):
         super().__init__(config)
         try:
-            import cohere
-            self.client = cohere.Client(config.api_key)
+            if config.api_key and config.api_key not in ["your_cohere_api_key_here", ""]:
+                import cohere
+                self.client = cohere.Client(config.api_key)
+            else:
+                self.client = None
+                logger.warning("Cohere API key not configured properly")
         except Exception as e:
             logger.error(f"Failed to initialize Cohere: {e}")
             self.client = None
