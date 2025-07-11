@@ -177,8 +177,12 @@ class AnthropicProvider(LLMProvider):
     def __init__(self, config: ProviderConfig):
         super().__init__(config)
         try:
-            import anthropic
-            self.client = anthropic.Anthropic(api_key=config.api_key)
+            if config.api_key and config.api_key not in ["your_anthropic_api_key_here", ""]:
+                import anthropic
+                self.client = anthropic.Anthropic(api_key=config.api_key)
+            else:
+                self.client = None
+                logger.warning("Anthropic API key not configured properly")
         except Exception as e:
             logger.error(f"Failed to initialize Anthropic: {e}")
             self.client = None
