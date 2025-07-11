@@ -10,7 +10,7 @@
 
 [build.environment]
   # Версия Node.js
-  NODE_VERSION = "18"
+  NODE_VERSION = "20"
   
   # Отключаем CI для избежания ошибок
   CI = "false"
