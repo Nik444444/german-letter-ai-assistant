@@ -357,7 +357,7 @@ class HuggingFaceProvider(LLMProvider):
             raise
             
     def is_available(self) -> bool:
-        return self.config.api_key and self.config.api_key not in ["your_huggingface_api_key_here", ""]
+        return self.api_key is not None
 
 class MultiLLMManager:
     """Manages multiple LLM providers with automatic fallback"""
