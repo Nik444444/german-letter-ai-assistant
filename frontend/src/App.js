@@ -251,23 +251,39 @@ function App() {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
       }
 
       const result = await response.json();
+      
+      // Validate result structure
+      if (!result || typeof result !== 'object') {
+        throw new Error('Invalid response format from server');
+      }
+      
       setAnalysis(result);
       
       // Telegram haptic feedback
-      if (tg && tg.HapticFeedback) {
-        tg.HapticFeedback.notificationOccurred('success');
+      try {
+        if (tg && tg.HapticFeedback) {
+          tg.HapticFeedback.notificationOccurred('success');
+        }
+      } catch (hapticError) {
+        console.log('Haptic feedback error:', hapticError);
       }
     } catch (err) {
       console.error('Analysis error:', err);
-      setError(t.uploadError);
+      setError(err.message || t.uploadError);
       
       // Telegram haptic feedback
-      if (tg && tg.HapticFeedback) {
-        tg.HapticFeedback.notificationOccurred('error');
+      try {
+        if (tg && tg.HapticFeedback) {
+          tg.HapticFeedback.notificationOccurred('error');
+        }
+      } catch (hapticError) {
+        console.log('Haptic feedback error:', hapticError);
+      }
       }
     } finally {
       setLoading(false);
