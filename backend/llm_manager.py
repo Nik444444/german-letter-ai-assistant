@@ -209,11 +209,15 @@ class OpenRouterProvider(LLMProvider):
     def __init__(self, config: ProviderConfig):
         super().__init__(config)
         try:
-            import openai
-            self.client = openai.OpenAI(
-                base_url="https://openrouter.ai/api/v1",
-                api_key=config.api_key
-            )
+            if config.api_key and config.api_key.startswith("sk-or-"):
+                import openai
+                self.client = openai.OpenAI(
+                    base_url="https://openrouter.ai/api/v1",
+                    api_key=config.api_key
+                )
+            else:
+                self.client = None
+                logger.warning("OpenRouter API key not configured properly")
         except Exception as e:
             logger.error(f"Failed to initialize OpenRouter: {e}")
             self.client = None
