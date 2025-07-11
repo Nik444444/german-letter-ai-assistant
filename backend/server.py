@@ -12,11 +12,15 @@ import pytesseract
 import PyPDF2
 import fitz  # PyMuPDF
 import json
-from llm_manager import llm_manager
 from dotenv import load_dotenv
+from llm_manager import llm_manager
+import os
 
 # Load environment variables from .env file
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '.env'))
+
+# Reinitialize LLM manager after loading environment variables
+llm_manager.load_providers()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
