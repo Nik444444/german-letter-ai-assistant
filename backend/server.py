@@ -14,7 +14,6 @@ import fitz  # PyMuPDF
 import json
 from llm_manager import llm_manager
 from dotenv import load_dotenv
-import os
 
 # Load environment variables from .env file
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '.env'))
