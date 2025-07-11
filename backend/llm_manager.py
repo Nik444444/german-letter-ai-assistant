@@ -132,7 +132,7 @@ class GeminiProvider(LLMProvider):
             raise
             
     def is_available(self) -> bool:
-        return self.model is not None and self.config.api_key != "your_gemini_api_key_here"
+        return self.model is not None and self.config.api_key and self.config.api_key not in ["your_gemini_api_key_here", ""]
 
 class OpenAIProvider(LLMProvider):
     """OpenAI GPT provider"""
