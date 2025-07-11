@@ -46,6 +46,7 @@ function App() {
   const [error, setError] = useState(null);
   const [language, setLanguage] = useState('en');
   const [dragOver, setDragOver] = useState(false);
+  const [llmProviders, setLlmProviders] = useState(null);
   const fileInputRef = useRef(null);
   
   const { tg, user, isMobile } = useTelegram();
