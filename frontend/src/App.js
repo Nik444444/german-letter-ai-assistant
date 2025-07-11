@@ -125,6 +125,9 @@ function App() {
       error: "Ошибка",
       noFile: "Пожалуйста, сначала выберите файл",
       uploadError: "Ошибка загрузки. Попробуйте еще раз.",
+      llmProvider: "Использован AI провайдер",
+      llmStatus: "Статус AI провайдеров",
+      activeProviders: "Активные провайдеры",
       urgencyLevels: {
         LOW: "Низкий",
         MEDIUM: "Средний",
