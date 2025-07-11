@@ -55,6 +55,29 @@ function App() {
   
   const { tg, user, isMobile } = useTelegram();
 
+  // Global error handler
+  useEffect(() => {
+    const handleError = (event) => {
+      console.error('Global error caught:', event.error);
+      // Don't crash the app on errors
+      event.preventDefault();
+    };
+
+    const handleUnhandledRejection = (event) => {
+      console.error('Unhandled promise rejection:', event.reason);
+      // Don't crash the app on promise rejections
+      event.preventDefault();
+    };
+
+    window.addEventListener('error', handleError);
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
+    return () => {
+      window.removeEventListener('error', handleError);
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    };
+  }, []);
+
   // Load LLM providers status on component mount
   useEffect(() => {
     const loadLlmStatus = async () => {
