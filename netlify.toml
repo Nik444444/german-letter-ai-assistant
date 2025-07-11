@@ -1,0 +1,45 @@
+[build]
+  # Директория для сборки фронтенда
+  base = "frontend/"
+  
+  # Команда для сборки
+  command = "yarn install && yarn build"
+  
+  # Директория с результатом сборки
+  publish = "build/"
+
+[build.environment]
+  # Версия Node.js
+  NODE_VERSION = "18"
+  
+  # Отключаем CI для избежания ошибок
+  CI = "false"
+
+[[redirects]]
+  # Для React Router - все неизвестные пути перенаправляем на index.html
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  # Настройка безопасности
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    X-XSS-Protection = "1; mode=block"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+[[headers]]
+  # Кеширование статических файлов
+  for = "/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  # CORS для API запросов
+  for = "/api/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type, Authorization"
