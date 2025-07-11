@@ -284,7 +284,6 @@ function App() {
       } catch (hapticError) {
         console.log('Haptic feedback error:', hapticError);
       }
-      }
     } finally {
       setLoading(false);
     }
