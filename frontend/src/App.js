@@ -328,6 +328,18 @@ function App() {
               👋 Hello, {user.first_name}!
             </div>
           )}
+          
+          {/* LLM Providers Status */}
+          {llmProviders && llmProviders.status === 'success' && (
+            <div className="mt-4 text-sm text-gray-600">
+              <div className="inline-flex items-center px-3 py-1 rounded-full bg-gradient-to-r from-green-100 to-blue-100 border border-green-200">
+                <svg className="w-4 h-4 mr-2 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {t.activeProviders}: {llmProviders.active_providers}/{llmProviders.total_providers}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Language Selector */}
