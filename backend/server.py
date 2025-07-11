@@ -164,6 +164,44 @@ async def get_llm_status():
         logger.error(f"Error getting LLM status: {e}")
         return {"status": "error", "message": str(e)}
 
+@app.post("/api/test-llm")
+async def test_llm_providers():
+    """Test all LLM providers with a simple prompt"""
+    try:
+        test_prompt = "Say 'Hello, I am working!' in JSON format: {\"message\": \"Hello, I am working!\"}"
+        
+        results = {}
+        for provider in llm_manager.providers:
+            try:
+                if provider.can_make_request() and provider.config.status.value == "active":
+                    provider.record_request()
+                    content = await provider.generate_content(test_prompt)
+                    provider.record_success()
+                    results[provider.name] = {
+                        "status": "success",
+                        "response": content[:100] + "..." if len(content) > 100 else content
+                    }
+                else:
+                    results[provider.name] = {
+                        "status": "skipped",
+                        "reason": "Rate limited or not active"
+                    }
+            except Exception as e:
+                provider.record_error(str(e))
+                results[provider.name] = {
+                    "status": "error",
+                    "error": str(e)
+                }
+        
+        return {
+            "status": "success",
+            "test_results": results,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Error testing LLM providers: {e}")
+        return {"status": "error", "message": str(e)}
+
 @app.post("/api/analyze-file", response_model=LetterAnalysisResponse)
 async def analyze_file(
     file: UploadFile = File(...),
