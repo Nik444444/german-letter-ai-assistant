@@ -160,6 +160,9 @@ function App() {
       error: "Fehler",
       noFile: "Bitte wählen Sie zuerst eine Datei aus",
       uploadError: "Upload fehlgeschlagen. Bitte versuchen Sie es erneut.",
+      llmProvider: "Verwendeter AI-Anbieter",
+      llmStatus: "AI-Anbieter Status",
+      activeProviders: "Aktive Anbieter",
       urgencyLevels: {
         LOW: "Niedrig",
         MEDIUM: "Mittel",
