@@ -10,19 +10,23 @@ const useTelegram = () => {
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
-    // Check if we're in Telegram Web App
-    if (window.Telegram && window.Telegram.WebApp) {
-      const telegram = window.Telegram.WebApp;
-      telegram.ready();
-      telegram.expand();
-      
-      setTg(telegram);
-      setUser(telegram.initDataUnsafe?.user);
-      
-      // Set theme colors
-      if (telegram.colorScheme === 'dark') {
-        document.body.style.backgroundColor = '#1a1a1a';
+    try {
+      // Check if we're in Telegram Web App
+      if (window.Telegram && window.Telegram.WebApp) {
+        const telegram = window.Telegram.WebApp;
+        telegram.ready();
+        telegram.expand();
+        
+        setTg(telegram);
+        setUser(telegram.initDataUnsafe?.user);
+        
+        // Set theme colors
+        if (telegram.colorScheme === 'dark') {
+          document.body.style.backgroundColor = '#1a1a1a';
+        }
       }
+    } catch (error) {
+      console.log('Telegram WebApp not available:', error);
     }
     
     // Check if mobile
