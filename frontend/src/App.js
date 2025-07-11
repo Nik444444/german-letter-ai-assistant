@@ -51,6 +51,21 @@ function App() {
   
   const { tg, user, isMobile } = useTelegram();
 
+  // Load LLM providers status on component mount
+  useEffect(() => {
+    const loadLlmStatus = async () => {
+      try {
+        const response = await fetch(`${BACKEND_URL}/api/llm-status`);
+        const data = await response.json();
+        setLlmProviders(data);
+      } catch (error) {
+        console.error('Failed to load LLM providers status:', error);
+      }
+    };
+    
+    loadLlmStatus();
+  }, []);
+
   const translations = {
     en: {
       title: "German Letter AI Assistant",
