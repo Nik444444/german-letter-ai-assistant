@@ -197,7 +197,7 @@ class AnthropicProvider(LLMProvider):
             raise
             
     def is_available(self) -> bool:
-        return self.client is not None and self.config.api_key != "your_anthropic_api_key_here"
+        return self.client is not None and self.config.api_key and self.config.api_key not in ["your_anthropic_api_key_here", ""]
 
 class OpenRouterProvider(LLMProvider):
     """OpenRouter provider"""
