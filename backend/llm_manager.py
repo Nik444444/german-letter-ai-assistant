@@ -104,9 +104,13 @@ class GeminiProvider(LLMProvider):
         super().__init__(config)
         try:
             import google.generativeai as genai
-            genai.configure(api_key=config.api_key)
-            self.model = genai.GenerativeModel('gemini-1.5-flash')
-            self.genai = genai
+            if config.api_key and config.api_key != "your_gemini_api_key_here":
+                genai.configure(api_key=config.api_key)
+                self.model = genai.GenerativeModel('gemini-1.5-flash')
+                self.genai = genai
+            else:
+                self.model = None
+                logger.warning("Gemini API key not configured")
         except Exception as e:
             logger.error(f"Failed to initialize Gemini: {e}")
             self.model = None
