@@ -2,3 +2,6 @@ tesseract-ocr
 tesseract-ocr-deu
 tesseract-ocr-eng
 tesseract-ocr-rus
+libtesseract-dev
+poppler-utils
+libpoppler-cpp-dev
