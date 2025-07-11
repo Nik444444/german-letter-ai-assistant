@@ -369,6 +369,10 @@ class MultiLLMManager:
     def load_providers(self):
         """Load all available providers"""
         try:
+            # Debug: Print environment variables
+            logger.info(f"OPENAI_API_KEY: {os.getenv('OPENAI_API_KEY', 'NOT_SET')[:20]}...")
+            logger.info(f"OPENROUTER_API_KEY: {os.getenv('OPENROUTER_API_KEY', 'NOT_SET')[:20]}...")
+            
             # Provider configurations
             provider_configs = {
                 "gemini": ProviderConfig(
