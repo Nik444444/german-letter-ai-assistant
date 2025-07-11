@@ -233,7 +233,7 @@ class OpenRouterProvider(LLMProvider):
             raise
             
     def is_available(self) -> bool:
-        return self.client is not None and self.config.api_key != "your_openrouter_api_key_here"
+        return self.client is not None and self.config.api_key and self.config.api_key.startswith("sk-or-")
 
 class CohereProvider(LLMProvider):
     """Cohere provider"""
