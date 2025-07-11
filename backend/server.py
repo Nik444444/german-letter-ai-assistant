@@ -6,13 +6,13 @@ from typing import List, Optional
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import google.generativeai as genai
 from PIL import Image
 import pytesseract
 import PyPDF2
 import fitz  # PyMuPDF
 import json
 from dotenv import load_dotenv
+from llm_manager import llm_manager
 
 # Load environment variables from .env file
 load_dotenv()
@@ -21,7 +21,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="German Letter AI Assistant")
+app = FastAPI(title="German Letter AI Assistant with Multi-LLM Support")
 
 # CORS middleware
 app.add_middleware(
@@ -31,17 +31,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Configure Gemini API
-GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
-if not GEMINI_API_KEY:
-    logger.error("GEMINI_API_KEY not found in environment variables")
-    raise ValueError("GEMINI_API_KEY is required")
-
-genai.configure(api_key=GEMINI_API_KEY)
-
-# Initialize Gemini model
-model = genai.GenerativeModel('gemini-1.5-flash')
 
 class LetterAnalysisRequest(BaseModel):
     text: str
@@ -53,6 +42,7 @@ class LetterAnalysisResponse(BaseModel):
     actions_needed: List[str]
     deadlines: List[str]
     response_template: Optional[str] = None
+    llm_provider: Optional[str] = None
 
 def extract_text_from_image(image_file) -> str:
     """Extract text from image using OCR"""
@@ -89,7 +79,7 @@ def extract_text_from_pdf(pdf_file) -> str:
         raise HTTPException(status_code=400, detail=f"Failed to extract text from PDF: {str(e)}")
 
 def create_analysis_prompt(text: str, language: str) -> str:
-    """Create a comprehensive prompt for Gemini to analyze German letters"""
+    """Create a comprehensive prompt for LLM to analyze German letters"""
     
     language_instructions = {
         "en": {
@@ -156,7 +146,22 @@ Make sure to:
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint"""
-    return {"status": "healthy", "service": "German Letter AI Assistant"}
+    return {"status": "healthy", "service": "German Letter AI Assistant with Multi-LLM Support"}
+
+@app.get("/api/llm-status")
+async def get_llm_status():
+    """Get status of all LLM providers"""
+    try:
+        status = llm_manager.get_provider_status()
+        return {
+            "status": "success",
+            "providers": status,
+            "total_providers": len(status),
+            "active_providers": sum(1 for p in status.values() if p["status"] == "active")
+        }
+    except Exception as e:
+        logger.error(f"Error getting LLM status: {e}")
+        return {"status": "error", "message": str(e)}
 
 @app.post("/api/analyze-file", response_model=LetterAnalysisResponse)
 async def analyze_file(
@@ -181,27 +186,39 @@ async def analyze_file(
         if not text.strip():
             raise HTTPException(status_code=400, detail="No text could be extracted from the file")
         
-        # Analyze with Gemini
+        # Analyze with Multi-LLM system
         prompt = create_analysis_prompt(text, language)
         
-        response = model.generate_content(prompt)
+        try:
+            response_text, used_provider = await llm_manager.generate_content(prompt)
+            logger.info(f"Successfully analyzed using provider: {used_provider}")
+        except Exception as e:
+            logger.error(f"All LLM providers failed: {e}")
+            return LetterAnalysisResponse(
+                analysis={"error": "All LLM providers failed", "details": str(e)},
+                summary="All AI services are currently unavailable. Please try again later.",
+                actions_needed=["Please try again later when AI services are available"],
+                deadlines=[],
+                response_template=None,
+                llm_provider="none"
+            )
         
         # Parse the JSON response
         try:
             # Check if response is empty
-            if not response.text or response.text.strip() == "":
-                logger.error("Empty response from Gemini")
+            if not response_text or response_text.strip() == "":
+                logger.error("Empty response from LLM")
                 return LetterAnalysisResponse(
                     analysis={"error": "Empty response from AI"},
                     summary="AI service returned empty response. Please try again.",
                     actions_needed=["Please try uploading the file again"],
                     deadlines=[],
-                    response_template=None
+                    response_template=None,
+                    llm_provider=used_provider
                 )
             
             # Extract JSON from response
-            response_text = response.text.strip()
-            logger.info(f"Gemini response: {response_text[:200]}...")
+            logger.info(f"LLM response: {response_text[:200]}...")
             
             # Try to find JSON in the response
             json_text = response_text
@@ -234,24 +251,26 @@ async def analyze_file(
                 summary=analysis_data.get("summary", "Analysis completed"),
                 actions_needed=analysis_data.get("actions_needed", []),
                 deadlines=analysis_data.get("deadlines", []),
-                response_template=analysis_data.get("response_template")
+                response_template=analysis_data.get("response_template"),
+                llm_provider=used_provider
             )
             
         except (json.JSONDecodeError, ValueError) as e:
-            logger.error(f"Failed to parse Gemini response as JSON: {str(e)}")
-            logger.error(f"Full response text: {response.text}")
+            logger.error(f"Failed to parse LLM response as JSON: {str(e)}")
+            logger.error(f"Full response text: {response_text}")
             
             # Fallback: return structured response with raw text
             return LetterAnalysisResponse(
                 analysis={
-                    "raw_response": response.text,
+                    "raw_response": response_text,
                     "error": "Failed to parse AI response",
                     "summary": "AI provided analysis but in unexpected format"
                 },
                 summary="AI analysis completed but response format was unexpected. Please try again.",
                 actions_needed=["Please try uploading the file again", "Check if the document contains clear German text"],
                 deadlines=[],
-                response_template=None
+                response_template=None,
+                llm_provider=used_provider
             )
         
     except Exception as e:
@@ -265,24 +284,36 @@ async def analyze_text(request: LetterAnalysisRequest):
     try:
         prompt = create_analysis_prompt(request.text, request.language)
         
-        response = model.generate_content(prompt)
+        try:
+            response_text, used_provider = await llm_manager.generate_content(prompt)
+            logger.info(f"Successfully analyzed using provider: {used_provider}")
+        except Exception as e:
+            logger.error(f"All LLM providers failed: {e}")
+            return LetterAnalysisResponse(
+                analysis={"error": "All LLM providers failed", "details": str(e)},
+                summary="All AI services are currently unavailable. Please try again later.",
+                actions_needed=["Please try again later when AI services are available"],
+                deadlines=[],
+                response_template=None,
+                llm_provider="none"
+            )
         
         # Parse the JSON response
         try:
             # Check if response is empty
-            if not response.text or response.text.strip() == "":
-                logger.error("Empty response from Gemini")
+            if not response_text or response_text.strip() == "":
+                logger.error("Empty response from LLM")
                 return LetterAnalysisResponse(
                     analysis={"error": "Empty response from AI"},
                     summary="AI service returned empty response. Please try again.",
                     actions_needed=["Please try with different text"],
                     deadlines=[],
-                    response_template=None
+                    response_template=None,
+                    llm_provider=used_provider
                 )
             
             # Extract JSON from response
-            response_text = response.text.strip()
-            logger.info(f"Gemini response: {response_text[:200]}...")
+            logger.info(f"LLM response: {response_text[:200]}...")
             
             # Try to find JSON in the response
             json_text = response_text
@@ -315,24 +346,26 @@ async def analyze_text(request: LetterAnalysisRequest):
                 summary=analysis_data.get("summary", "Analysis completed"),
                 actions_needed=analysis_data.get("actions_needed", []),
                 deadlines=analysis_data.get("deadlines", []),
-                response_template=analysis_data.get("response_template")
+                response_template=analysis_data.get("response_template"),
+                llm_provider=used_provider
             )
             
         except (json.JSONDecodeError, ValueError) as e:
-            logger.error(f"Failed to parse Gemini response as JSON: {str(e)}")
-            logger.error(f"Full response text: {response.text}")
+            logger.error(f"Failed to parse LLM response as JSON: {str(e)}")
+            logger.error(f"Full response text: {response_text}")
             
             # Fallback: return structured response with raw text
             return LetterAnalysisResponse(
                 analysis={
-                    "raw_response": response.text,
+                    "raw_response": response_text,
                     "error": "Failed to parse AI response",
                     "summary": "AI provided analysis but in unexpected format"
                 },
                 summary="AI analysis completed but response format was unexpected. Please try again.",
                 actions_needed=["Please try with different text", "Check if the text contains clear German content"],
                 deadlines=[],
-                response_template=None
+                response_template=None,
+                llm_provider=used_provider
             )
         
     except Exception as e:
