@@ -326,8 +326,12 @@ class HuggingFaceProvider(LLMProvider):
     
     def __init__(self, config: ProviderConfig):
         super().__init__(config)
-        self.api_key = config.api_key
-        self.base_url = "https://api-inference.huggingface.co/models/microsoft/DialoGPT-large"
+        if config.api_key and config.api_key not in ["your_huggingface_api_key_here", ""]:
+            self.api_key = config.api_key
+            self.base_url = "https://api-inference.huggingface.co/models/microsoft/DialoGPT-large"
+        else:
+            self.api_key = None
+            logger.warning("Hugging Face API key not configured properly")
         
     async def generate_content(self, prompt: str) -> str:
         try:
