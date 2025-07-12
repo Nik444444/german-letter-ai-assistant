@@ -18,3 +18,4 @@ anthropic
 cohere
 mistralai
 requests
+httpx
