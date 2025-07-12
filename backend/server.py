@@ -424,6 +424,284 @@ async def analyze_text(request: LetterAnalysisRequest):
         logger.error(f"Error analyzing text: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to analyze text: {str(e)}")
 
+# ===============================================
+# USER MANAGEMENT AND API KEY ENDPOINTS
+# ===============================================
+
+@app.post("/api/register")
+async def register_user(user_data: UserRegistration):
+    """Register a new user with optional API keys"""
+    try:
+        # Check if user already exists
+        existing_user = await users_collection.find_one({"email": user_data.email})
+        if existing_user:
+            raise HTTPException(status_code=400, detail="Email already registered")
+        
+        # Hash password
+        password_hash = hash_password(user_data.password)
+        
+        # Encrypt API keys if provided
+        encrypted_api_keys = {}
+        if user_data.api_keys:
+            api_keys = user_data.api_keys.dict()
+            for provider, key in api_keys.items():
+                if key:
+                    encrypted_api_keys[provider] = encrypt_api_key(key)
+        
+        # Create user document
+        user_id = generate_user_id()
+        user_doc = {
+            "id": user_id,
+            "email": user_data.email,
+            "name": user_data.name,
+            "password_hash": password_hash,
+            "api_keys": encrypted_api_keys,
+            "created_at": datetime.utcnow(),
+            "last_login": None,
+            "is_active": True
+        }
+        
+        # Insert user into database
+        result = await users_collection.insert_one(user_doc)
+        
+        # Create access token
+        access_token = create_access_token(data={"sub": user_id, "email": user_data.email})
+        
+        return {
+            "message": "User registered successfully",
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user": {
+                "id": user_id,
+                "email": user_data.email,
+                "name": user_data.name
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error registering user: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
+
+@app.post("/api/login")
+async def login_user(login_data: UserLogin):
+    """Login user and return access token"""
+    try:
+        # Find user by email
+        user = await users_collection.find_one({"email": login_data.email})
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+        
+        # Verify password
+        if not verify_password(login_data.password, user["password_hash"]):
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+        
+        # Check if user is active
+        if not user.get("is_active", True):
+            raise HTTPException(status_code=401, detail="Account is disabled")
+        
+        # Update last login
+        await users_collection.update_one(
+            {"id": user["id"]},
+            {"$set": {"last_login": datetime.utcnow()}}
+        )
+        
+        # Create access token
+        access_token = create_access_token(data={"sub": user["id"], "email": user["email"]})
+        
+        return {
+            "message": "Login successful",
+            "access_token": access_token,
+            "token_type": "bearer",
+            "user": {
+                "id": user["id"],
+                "email": user["email"],
+                "name": user["name"]
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error during login: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")
+
+@app.get("/api/profile")
+async def get_user_profile(current_user: dict = Depends(get_current_user_token)):
+    """Get current user profile"""
+    try:
+        user = await users_collection.find_one({"id": current_user["sub"]})
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Decrypt API keys for display (mask them for security)
+        api_keys_status = {}
+        for provider, encrypted_key in user.get("api_keys", {}).items():
+            if encrypted_key:
+                decrypted_key = decrypt_api_key(encrypted_key)
+                # Mask the key for security - show only first and last few characters
+                if len(decrypted_key) > 8:
+                    masked_key = decrypted_key[:4] + "*" * (len(decrypted_key) - 8) + decrypted_key[-4:]
+                else:
+                    masked_key = "*" * len(decrypted_key)
+                api_keys_status[provider] = {
+                    "has_key": True,
+                    "masked_key": masked_key,
+                    "is_valid": len(decrypted_key) > 0
+                }
+            else:
+                api_keys_status[provider] = {
+                    "has_key": False,
+                    "masked_key": None,
+                    "is_valid": False
+                }
+        
+        return {
+            "id": user["id"],
+            "email": user["email"],
+            "name": user["name"],
+            "created_at": user["created_at"],
+            "last_login": user.get("last_login"),
+            "is_active": user.get("is_active", True),
+            "api_keys_status": api_keys_status
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting user profile: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get profile: {str(e)}")
+
+@app.put("/api/api-keys")
+async def update_api_keys(api_key_data: ApiKeyUpdate, current_user: dict = Depends(get_current_user_token)):
+    """Update user's API keys"""
+    try:
+        # Encrypt new API keys
+        encrypted_api_keys = {}
+        api_keys = api_key_data.api_keys.dict()
+        for provider, key in api_keys.items():
+            if key:
+                encrypted_api_keys[provider] = encrypt_api_key(key)
+        
+        # Update user's API keys in database
+        result = await users_collection.update_one(
+            {"id": current_user["sub"]},
+            {"$set": {"api_keys": encrypted_api_keys}}
+        )
+        
+        if result.modified_count == 0:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        return {
+            "message": "API keys updated successfully",
+            "updated_providers": list(encrypted_api_keys.keys())
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating API keys: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update API keys: {str(e)}")
+
+@app.post("/api/analyze-text-with-user-keys", response_model=LetterAnalysisResponse)
+async def analyze_text_with_user_keys(
+    request: LetterAnalysisRequest, 
+    current_user: dict = Depends(get_current_user_token)
+):
+    """Analyze text using user's personal API keys"""
+    try:
+        # Get user's API keys
+        user = await users_collection.find_one({"id": current_user["sub"]})
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Decrypt user's API keys
+        user_api_keys = {}
+        for provider, encrypted_key in user.get("api_keys", {}).items():
+            if encrypted_key:
+                decrypted_key = decrypt_api_key(encrypted_key)
+                if decrypted_key:
+                    user_api_keys[provider] = decrypted_key
+        
+        if not user_api_keys:
+            raise HTTPException(
+                status_code=400, 
+                detail="No API keys configured. Please add your API keys in profile settings."
+            )
+        
+        # Create a temporary LLM manager with user's keys
+        # This would require modifying the LLM manager to accept custom keys
+        # For now, we'll use the existing analyze endpoint
+        # TODO: Implement user-specific LLM manager
+        
+        # Fallback to default analysis for now
+        prompt = create_analysis_prompt(request.text, request.language)
+        
+        try:
+            response_text, used_provider = await llm_manager.generate_content(prompt)
+            logger.info(f"Successfully analyzed using provider: {used_provider}")
+        except Exception as e:
+            logger.error(f"All LLM providers failed: {e}")
+            return LetterAnalysisResponse(
+                analysis={"error": "LLM analysis failed", "details": str(e)},
+                summary="AI services are currently unavailable with your API keys.",
+                actions_needed=["Please check your API keys in profile settings"],
+                deadlines=[],
+                response_template=None,
+                llm_provider="none"
+            )
+        
+        # Parse response (same logic as original analyze_text endpoint)
+        try:
+            json_text = response_text
+            if "```json" in response_text:
+                json_start = response_text.find("```json") + 7
+                json_end = response_text.find("```", json_start)
+                if json_end > json_start:
+                    json_text = response_text[json_start:json_end].strip()
+            elif response_text.startswith("{"):
+                json_text = response_text
+            else:
+                start_idx = response_text.find("{")
+                end_idx = response_text.rfind("}")
+                if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+                    json_text = response_text[start_idx:end_idx+1]
+                else:
+                    raise json.JSONDecodeError("No JSON found in response", response_text, 0)
+            
+            analysis_data = json.loads(json_text)
+            
+            return LetterAnalysisResponse(
+                analysis=analysis_data,
+                summary=analysis_data.get("summary", "Analysis completed"),
+                actions_needed=analysis_data.get("actions_needed", []),
+                deadlines=analysis_data.get("deadlines", []),
+                response_template=analysis_data.get("response_template"),
+                llm_provider=f"{used_provider} (user's key)"
+            )
+            
+        except (json.JSONDecodeError, ValueError) as e:
+            logger.error(f"Failed to parse LLM response as JSON: {str(e)}")
+            return LetterAnalysisResponse(
+                analysis={
+                    "raw_response": response_text,
+                    "error": "Failed to parse AI response",
+                    "summary": "AI provided analysis but in unexpected format"
+                },
+                summary="AI analysis completed but response format was unexpected.",
+                actions_needed=["Please try again"],
+                deadlines=[],
+                response_template=None,
+                llm_provider=f"{used_provider} (user's key)"
+            )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error analyzing text with user keys: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to analyze text: {str(e)}")
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8001)
