@@ -4,7 +4,7 @@ import uuid
 import logging
 from datetime import datetime
 from typing import List, Optional
-from fastapi import FastAPI, File, UploadFile, HTTPException, Form
+from fastapi import FastAPI, File, UploadFile, HTTPException, Form, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from PIL import Image
@@ -14,6 +14,15 @@ import fitz  # PyMuPDF
 import json
 from dotenv import load_dotenv
 from llm_manager import llm_manager
+from models import (
+    UserRegistration, UserLogin, UserProfile, UserInDB, 
+    ApiKeyUpdate, users_collection, UserApiKeys
+)
+from auth import (
+    hash_password, verify_password, create_access_token, 
+    encrypt_api_key, decrypt_api_key, get_current_user_token,
+    generate_user_id
+)
 import os
 
 # Load environment variables from .env file
